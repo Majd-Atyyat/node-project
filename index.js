@@ -2,6 +2,8 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const pg = require('pg');
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
+const logsRouter = require('./routes/logs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -126,6 +128,9 @@ app.post('/login', (req, res) => {
     // Return the JWT in the response
     res.json({ token });
   });
+
+  app.use('/logs', authenticate, logsRouter);
+
   
 
 // Start the server
