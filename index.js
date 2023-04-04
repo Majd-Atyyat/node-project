@@ -2,8 +2,9 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const pg = require('pg');
 const jwt = require('jsonwebtoken');
-const mongoose = require('mongoose');
-const logsRouter = require('./routes/logs');
+const bcrypt = require('bcrypt');
+
+
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -23,8 +24,6 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
 //Create a middleware function to verify the JWT in the request header
-
-
 
 function authenticate(req, res, next) {
   const authHeader = req.headers.authorization;
@@ -113,23 +112,70 @@ app.delete('/models/:id', authenticate, (req, res) => {
   });
 });
 
-// Authorization 
-app.post('/login', (req, res) => {
-    const { username, password } = req.body;
-  
-    // Check if username and password are valid
-    if (username !== "admin" || password !== "password") {
-      return res.status(401).json({ message: "Invalid credentials" });
+// Authentication 
+// Sign up a new user
+app.post('/signup', (req, res) => {
+  const { username, password } = req.body;
+
+  // Check if username and password are valid
+  if (!username || !password) {
+    return res.status(400).json({ message: "Username and password are required" });
+  }
+
+  // Check if the username is already taken
+  pool.query(`SELECT * FROM users WHERE username = '${username}'`, (err, result) => {
+    if (err) {
+      throw err;
     }
-  
+
+    if (result.rows.length > 0) {
+      return res.status(409).json({ message: "Username is already taken" });
+    }
+
+    // Hash the password and insert the new user into the database
+    const hash = bcrypt.hashSync(password, 10);
+    pool.query(`INSERT INTO users (username, password) VALUES ('${username}', '${hash}')`, (err, result) => {
+      if (err) {
+        throw err;
+      }
+
+      res.json({ message: "User created successfully" });
+    });
+  });
+});
+
+// Sign in a user and generate a JWT
+app.post('/signin', (req, res) => {
+  const { username, password } = req.body;
+
+  // Check if username and password are valid
+  if (!username || !password) {
+    return res.status(400).json({ message: "Username and password are required" });
+  }
+
+  // Check if the user exists in the database
+  pool.query(`SELECT * FROM users WHERE username = '${username}'`, (err, result) => {
+    if (err) {
+      throw err;
+    }
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({ message: "Invalid username or password" });
+    }
+
+    // Verify the password hash
+    const user = result.rows[0];
+    if (!bcrypt.compareSync(password, user.password)) {
+      return res.status(401).json({ message: "Invalid username or password" });
+    }
+
     // Generate a JWT with a payload containing the username and expiration date
     const token = jwt.sign({ username }, JWT_SECRET, { expiresIn: "100h" });
-  
+
     // Return the JWT in the response
     res.json({ token });
   });
-
-  app.use('/logs', authenticate, logsRouter);
+});
 
   
 
