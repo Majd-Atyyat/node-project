@@ -3,8 +3,7 @@ const bodyParser = require('body-parser');
 const pg = require('pg');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
-
-
+const mongoose = require('mongoose');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -22,6 +21,48 @@ const pool = new pg.Pool(config);
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+
+// connect to mongo database
+mongoose.connect('mongodb://localhost/logSchema', {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+})
+  .then(() => console.log('Connected to MongoDB'))
+  .catch((err) => console.error('Could not connect to MongoDB', err));
+
+  const mongoose = require('mongoose');
+
+  const requestLogSchema = new mongoose.Schema({
+    endpoint: { type: String, required: true },
+    ip: { type: String, required: true },
+    time: { type: Date, default: Date.now }
+  });
+  
+  const RequestLog = mongoose.model('RequestLog', requestLogSchema);
+  
+  const newLog = new RequestLog({
+    endpoint: req.path,
+    ip: req.ip
+  });
+  
+  newLog.save();
+//retrieve  logs, this endpoint that returns a paginated list
+app.get('/logs', async (req, res) => {
+  const page = parseInt(req.query.page || 1);
+  const limit = parseInt(req.query.limit || 10);
+  const skip = (page - 1) * limit;
+
+  const logs = await RequestLog.find().sort({ time: -1 }).skip(skip).limit(limit);
+  const total = await RequestLog.countDocuments();
+
+  res.json({
+    logs,
+    page,
+    totalPages: Math.ceil(total / limit),
+    totalLogs: total
+  });
+});
+
 
 //Create a middleware function to verify the JWT in the request header
 
